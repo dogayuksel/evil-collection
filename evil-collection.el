@@ -126,6 +126,7 @@ through removing their entry from `evil-collection-mode-list'."
     bm
     bookmark
     (buff-menu "buff-menu")
+    bufler
     calc
     calendar
     cider
