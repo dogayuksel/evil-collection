@@ -317,7 +317,6 @@ moment.")
        (,states magit-status-mode-map "gpu" magit-jump-to-unpushed-to-upstream)
        (,states magit-status-mode-map "gpp" magit-jump-to-unpushed-to-pushremote)
        (,states magit-status-mode-map "gh"  magit-section-up                       "^")
-       (,states magit-diff-mode-map "gj" magit-section-forward)
        (,states magit-diff-mode-map "gd" magit-jump-to-diffstat-or-diff "j")
        ;; NOTE This is now transient-map and the binding is C-g.
        ;; ((emacs) magit-popup-mode-map "<escape>" "q")
@@ -465,7 +464,7 @@ denotes the original magit key for this command.")
      (dolist (cmd evil-collection-magit-rebase-commands-w-descriptions)
        (when (car cmd)
          (evil-collection-define-key evil-collection-magit-state 'git-rebase-mode-map
-           (car cmd) (nth 1 cmd))))
+           (kbd (car cmd)) (nth 1 cmd))))
 
      (evil-make-overriding-map git-rebase-mode-map evil-collection-magit-state)
 
