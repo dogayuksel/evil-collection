@@ -38,9 +38,31 @@
 (require 'magit nil t)
 
 (defvar magit-blame-mode-map)
+(defvar magit-blame-read-only-mode-map)
+(defvar magit-blob-mode-map)
+(defvar magit-cherry-mode-map)
+(defvar magit-diff-mode-map)
+(defvar magit-file-section-map)
+(defvar magit-hunk-section-map)
+(defvar magit-log-mode-map)
+(defvar magit-log-read-revs-map)
+(defvar magit-log-select-mode-map)
+(defvar magit-process-mode-map)
+(defvar magit-reflog-mode-map)
+(defvar magit-refs-mode-map)
+(defvar magit-repolist-mode-map)
+(defvar magit-status-mode-map)
+(defvar magit-submodule-list-mode-map)
 
-(defconst evil-collection-magit-maps '(magit-blame-mode-map
-                                       magit-blame-read-only-mode-map))
+(defconst evil-collection-magit-maps '(evil-collection-magit-toggle-text-minor-mode-map
+                                       magit-blame-mode-map
+                                       magit-blame-read-only-mode-map
+                                       magit-blob-mode-map
+                                       magit-log-mode-map
+                                       magit-mode-map
+                                       magit-repolist-mode-map
+                                       magit-status-mode-map
+                                       magit-submodule-list-mode-map))
 
 (defcustom evil-collection-magit-use-y-for-yank t
   "When non nil, replace \"y\" for `magit-show-refs-popup' with
@@ -318,6 +340,7 @@ moment.")
        (,states magit-status-mode-map "gpp" magit-jump-to-unpushed-to-pushremote)
        (,states magit-status-mode-map "gh"  magit-section-up                       "^")
        (,states magit-diff-mode-map "gd" magit-jump-to-diffstat-or-diff "j")
+       ((visual) magit-diff-mode-map "y" magit-copy-section-value)
        ;; NOTE This is now transient-map and the binding is C-g.
        ;; ((emacs) magit-popup-mode-map "<escape>" "q")
        )
@@ -341,7 +364,7 @@ moment.")
            (,states magit-mode-map "yr"   magit-show-refs            "y")
            (,states magit-mode-map "ys"   magit-copy-section-value   "C-w")
            (,states magit-mode-map "yb"   magit-copy-buffer-revision "M-w")
-           ((visual) magit-mode-map "y"   evil-yank))
+           ((visual) magit-mode-map "y"   magit-copy-section-value))
        `((,states magit-mode-map "v" set-mark-command)
          (,states magit-mode-map "V" set-mark-command)
          (,states magit-mode-map "<escape>" evil-collection-magit-maybe-deactivate-mark)))
@@ -427,13 +450,13 @@ denotes the original magit key for this command.")
 (add-hook 'magit-blame-mode-hook 'evil-normalize-keymaps)
 
 (evil-set-initial-state 'magit-repolist-mode 'motion)
-(evil-define-key 'motion magit-repolist-mode-map
+(evil-collection-define-key 'motion 'magit-repolist-mode-map
   (kbd "RET") 'magit-repolist-status
   (kbd "gr")  'magit-list-repositories)
 (add-hook 'magit-repolist-mode-hook 'evil-normalize-keymaps)
 
 (evil-set-initial-state 'magit-submodule-list-mode 'motion)
-(evil-define-key 'motion magit-submodule-list-mode-map
+(evil-collection-define-key 'motion 'magit-submodule-list-mode-map
   (kbd "RET") 'magit-repolist-status
   (kbd "gr")  'magit-list-submodules)
 (add-hook 'magit-submodule-list-mode-hook 'evil-normalize-keymaps)
@@ -485,7 +508,8 @@ denotes the original magit key for this command.")
                (flush-lines (concat "^" (regexp-quote comment-start) ".+ = "))
                (dolist (cmd evil-collection-magit-rebase-commands-w-descriptions)
                  (insert
-                  (format (concat comment-start " %-8s %s\n")
+                  (format "%s %-8s %s\n"
+                          comment-start 
                           (if (and (car cmd)
                                    (eq (nth 1 cmd)
                                        (lookup-key aux-map (kbd (car cmd)))))
@@ -550,7 +574,7 @@ evil-collection-magit affects.")
      (magit-dispatch "v" "-" magit-reverse)
      (magit-dispatch "k" "x" magit-discard)
      (magit-remote "k" "x" magit-remote-remove)
-     (magit-revert "v" "o" magit-revert-no-commit)
+     (magit-revert "v" "-" magit-revert-no-commit)
      ;; FIXME: how to properly handle a popup with a key that appears twice (in
      ;; `define-transient-command' definition)? Currently we rely on:
      ;; 1. first call to `evil-collection-magit-change-popup-key' changes the first "V"
@@ -558,8 +582,8 @@ evil-collection-magit affects.")
      ;;    definition of `magit-revert'), second call changes the second "V".
      ;; 2. the remapping here are in the same order as in `magit-revert'
      ;;    definition
-     (magit-revert "V" "O" magit-revert-and-commit)
-     (magit-revert "V" "O" magit-sequencer-continue)
+     (magit-revert "V" "_" magit-revert-and-commit)
+     (magit-revert "V" "_" magit-sequencer-continue)
      (magit-tag    "k" "x" magit-tag-delete)))
   "Changes to popup keys")
 
@@ -573,6 +597,12 @@ evil-collection-magit affects.")
     (dolist (change evil-collection-magit-popup-changes)
       (apply #'evil-collection-magit-change-popup-key change))
     (with-eval-after-load 'forge
+      ;; When `forge' is loaded, it maps `forge-dispatch' to ' key which is
+      ;; set for `magit-submodule', wiping it so we add it back after `forge'
+      ;; loads.
+      (transient-append-suffix 'magit-dispatch "M"
+        '("'" "Submodule" magit-submodule))
+      ;; Clear `forge' key and re-add back in as "@".
       (transient-remove-suffix 'magit-dispatch 'forge-dispatch)
       (transient-append-suffix 'magit-dispatch "!"
         '("@" "Forge" forge-dispatch)))
@@ -581,13 +611,7 @@ evil-collection-magit affects.")
 (defun evil-collection-magit-revert-popups ()
   "Revert popup keys changed by evil-collection-magit."
   (put 'magit-dispatch 'transient--layout evil-collection-magit-dispatch-popup-backup)
-  (when evil-collection-magit-popup-keys-changed
-    (dolist (change evil-collection-magit-popup-changes)
-      (evil-collection-magit-change-popup-key
-       (nth 0 change) (nth 2 change) (nth 1 change)))
-    (with-eval-after-load 'forge
-      (transient-suffix-put 'magit-dispatch "@" :key "'"))
-    (setq evil-collection-magit-popup-keys-changed nil)))
+  (setq evil-collection-magit-popup-keys-changed nil))
 
 ;;;###autoload
 (defun evil-collection-magit-init ()
@@ -614,10 +638,11 @@ go back to evil-collection-magit behavior."
 using `evil-collection-magit-toggle-text-mode'"
   :keymap (make-sparse-keymap))
 
-(evil-define-key 'normal evil-collection-magit-toggle-text-minor-mode-map
+(evil-collection-define-key 'normal
+  'evil-collection-magit-toggle-text-minor-mode-map
   "\C-t" 'evil-collection-magit-toggle-text-mode
   "\\"   'evil-collection-magit-toggle-text-mode)
-(evil-define-key evil-collection-magit-state magit-mode-map
+(evil-collection-define-key evil-collection-magit-state 'magit-mode-map
   "\C-t" 'evil-collection-magit-toggle-text-mode
   "\\"   'evil-collection-magit-toggle-text-mode)
 

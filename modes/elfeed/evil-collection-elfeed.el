@@ -59,7 +59,12 @@
 
     ;; refresh
     "gR" 'elfeed-search-fetch ; TODO: Which update function is more useful?
-    "gr" 'elfeed-search-update--force)
+    "gr" 'elfeed-search-update--force
+
+    ;; quit
+    "q" 'elfeed-search-quit-window
+    "ZQ" 'elfeed-search-quit-window
+    "ZZ" 'elfeed-search-quit-window)
 
   (evil-collection-define-key '(normal visual) 'elfeed-search-mode-map
     "+" 'elfeed-search-tag-all
@@ -102,16 +107,9 @@
     "ZQ" 'elfeed-kill-buffer
     "ZZ" 'elfeed-kill-buffer)
 
-  (evil-collection-define-key 'operator 'elfeed-show-mode-map
-    ;; Like `eww'.
-    "u" '(menu-item
-          ""
-          nil
-          :filter (lambda (&optional _)
-                    (when (memq evil-this-operator
-                                evil-collection-yank-operators)
-                      (setq evil-inhibit-operator t)
-                      #'elfeed-show-yank)))))
+  ;; yu, like `eww'
+  (evil-collection-define-operator-key 'yank 'elfeed-show-mode-map
+    "u" 'elfeed-show-yank))
 
 (provide 'evil-collection-elfeed)
 ;;; evil-collection-elfeed.el ends here

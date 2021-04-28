@@ -72,7 +72,23 @@
 
     "gg" 'evil-goto-first-line
 
-    ;; TODO: Restore digit arguments?  Use g[n] instead.
+    ;; mouse integration
+    [mouse-2]     'Info-mouse-follow-nearest-node
+    [follow-link] 'mouse-face
+    ;; make mac user happy
+    [double-wheel-left]  'Info-history-back
+    [double-wheel-right] 'Info-history-forward
+
+    ;; digit arguments
+    "g1" 'Info-nth-menu-item
+    "g2" 'Info-nth-menu-item
+    "g3" 'Info-nth-menu-item
+    "g4" 'Info-nth-menu-item
+    "g5" 'Info-nth-menu-item
+    "g6" 'Info-nth-menu-item
+    "g7" 'Info-nth-menu-item
+    "g8" 'Info-nth-menu-item
+    "g9" 'Info-nth-menu-item
 
     ;; NOTE: We do NOT search the entire buffer, only the narrowed buffer.
     "n" evil-collection-evil-search-next
@@ -113,15 +129,9 @@
     "0" 'evil-digit-argument-or-evil-beginning-of-line
     "gg" 'evil-goto-first-line)
 
-  (evil-collection-define-key 'operator 'Info-mode-map
-    "u" '(menu-item                     ; Like eww.
-          ""
-          nil
-          :filter (lambda (&optional _)
-                    (when (memq evil-this-operator
-                                evil-collection-yank-operators)
-                      (setq evil-inhibit-operator t)
-                      #'Info-copy-current-node-name)))))
+  ;; yu, Like eww.
+  (evil-collection-define-operator-key 'yank 'Info-mode-map
+    "u" 'Info-copy-current-node-name))
 
 (provide 'evil-collection-info)
 ;;; evil-collection-info.el ends here

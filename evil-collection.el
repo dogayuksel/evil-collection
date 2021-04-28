@@ -115,6 +115,13 @@ through removing their entry from `evil-collection-mode-list'."
   :type 'boolean
   :group 'evil-collection)
 
+(defcustom evil-collection-want-find-usages-bindings t
+  "Whether to bind `xref-find-references'-like bindings.
+
+This will bind additional find-* type commands, e.g. usages, assignments, etc.."
+  :type 'boolean
+  :group 'evil-collection)
+
 (defvar evil-collection--supported-modes
   `(2048-game
     ag
@@ -147,6 +154,7 @@ through removing their entry from `evil-collection-mode-list'."
     dired
     dired-sidebar
     disk-usage
+    distel
     doc-view
     docker
     ebib
@@ -159,6 +167,7 @@ through removing their entry from `evil-collection-mode-list'."
     elisp-mode
     elisp-refs
     elisp-slime-nav
+    embark
     emms
     epa
     ert
@@ -207,6 +216,7 @@ through removing their entry from `evil-collection-mode-list'."
     magit-todos
     ,@(when evil-collection-setup-minibuffer '(minibuffer))
     monky
+    mpdel
     mu4e
     mu4e-conversation
     neotree
@@ -242,6 +252,7 @@ through removing their entry from `evil-collection-mode-list'."
     robe
     rtags
     ruby-mode
+    scroll-lock
     sh-script
     ,@(when (>= emacs-major-version 28) '(shortdoc))
     simple
@@ -321,6 +332,64 @@ Evil Collection for that mode. More arguments may be added in the future, so
 functions added to this hook should include a \"&rest _rest\" for forward
 compatibility.")
 
+(defun evil-collection-define-operator-key (operator map-sym &rest bindings)
+  "Defines a key on a specific operator e.g. yank or delete.
+
+This function is useful for adding specific binds to operator maps
+(e.g. `evil-yank' or `evil-delete') without erasing the original bind.
+
+For example, say one wants to bind \"yf\" to something but also wants to keep
+\"yy\".
+
+This function takes care of checking the whitelist/blacklist against the full
+binding.
+
+For example:
+(evil-collection-define-operator-key 'yank 'pass-mode-map \"f\" 'pass-copy-field)
+
+This will check \"yf\" against a user's white/blacklist and also record the
+binding in `annalist' as so."
+  (declare (indent defun))
+  (let* ((prefix (if (eq operator 'yank) "y" "d"))
+         (operators (if (eq operator 'yank)
+                        'evil-collection-yank-operators
+                      'evil-collection-delete-operators))
+         (remap (if (eq operator 'yank) [remap evil-yank] [remap evil-delete]))
+         (whitelist (mapcar 'kbd evil-collection-key-whitelist))
+         (blacklist (mapcar 'kbd evil-collection-key-blacklist))
+         filtered-bindings)
+    (while bindings
+      (let* ((key (pop bindings))
+             (key-with-prefix (concat prefix key))
+             (def (pop bindings))
+             (def-with-menu-item
+              `(menu-item
+                ""
+                nil
+                :filter
+                (lambda (&optional _)
+                  (when (or
+                         (eq evil-this-operator (key-binding ,remap))
+                         (memq evil-this-operator ,operators))
+                    (setq evil-inhibit-operator t)
+                    ',def)))))
+        (when (or (and whitelist (member key-with-prefix whitelist))
+                  (not (member key-with-prefix blacklist)))
+          (annalist-record 'evil-collection 'keybindings
+                           ;; Record the binding as if it was in 'normal mode
+                           ;; instead of 'operator mode as the user would be in
+                           ;; normal mode when triggering the operator.
+                           (list map-sym 'normal key-with-prefix def)
+                           :local (or (eq map-sym 'local)
+                                      (local-variable-p map-sym)))
+          ;; Use the original key declared when actually setting the binding.
+          (push key filtered-bindings)
+          ;; Use the definition attached to the menu-item when setting the
+          ;; binding.
+          (push def-with-menu-item filtered-bindings))))
+    (setq filtered-bindings (nreverse filtered-bindings))
+    (evil-collection--define-key 'operator map-sym filtered-bindings)))
+
 (defun evil-collection-define-key (state map-sym &rest bindings)
   "Wrapper for `evil-define-key*' with additional features.
 Unlike `evil-define-key*' MAP-SYM should be a quoted keymap other than the
@@ -343,32 +412,38 @@ to filter keys on the basis of `evil-collection-key-whitelist' and
           (push key filtered-bindings)
           (push def filtered-bindings))))
     (setq filtered-bindings (nreverse filtered-bindings))
-    (cond ((null filtered-bindings))
-          ((and (boundp map-sym) (keymapp (symbol-value map-sym)))
-           (condition-case-unless-debug err
-               (apply #'evil-define-key*
-                      state (symbol-value map-sym) filtered-bindings)
-             (error
-              (message "evil-collection: error setting key in %s %S"
-                       map-sym err))))
-          ((boundp map-sym)
-           (user-error "evil-collection: %s is not a keymap" map-sym))
-          (t
-           (let* ((fname (format "evil-collection-define-key-in-%s" map-sym))
-                  (fun (make-symbol fname)))
-             (fset fun `(lambda (&rest args)
-                          (when (and (boundp ',map-sym) (keymapp ,map-sym))
-                            (remove-hook 'after-load-functions #',fun)
-                            (condition-case-unless-debug err
-                                (apply #'evil-define-key*
-                                       ',state ,map-sym ',filtered-bindings)
-                              (error
-                               (message
-                                ,(format
-                                  "evil-collection: error setting key in %s %%S"
-                                  map-sym)
-                                err))))))
-             (add-hook 'after-load-functions fun t))))))
+    (evil-collection--define-key state map-sym filtered-bindings)))
+
+(defun evil-collection--define-key (state map-sym bindings)
+  "Workhorse function for `evil-collection-define-key'.
+
+See `evil-collection-define-key' docstring for more details."
+  (cond ((null bindings))
+        ((and (boundp map-sym) (keymapp (symbol-value map-sym)))
+         (condition-case-unless-debug err
+             (apply #'evil-define-key*
+                    state (symbol-value map-sym) bindings)
+           (error
+            (message "evil-collection: error setting key in %s %S"
+                     map-sym err))))
+        ((boundp map-sym)
+         (user-error "evil-collection: %s is not a keymap" map-sym))
+        (t
+         (let* ((fname (format "evil-collection-define-key-in-%s" map-sym))
+                (fun (make-symbol fname)))
+           (fset fun `(lambda (&rest args)
+                        (when (and (boundp ',map-sym) (keymapp ,map-sym))
+                          (remove-hook 'after-load-functions #',fun)
+                          (condition-case-unless-debug err
+                              (apply #'evil-define-key*
+                                     ',state ,map-sym ',bindings)
+                            (error
+                             (message
+                              ,(format
+                                "evil-collection: error setting key in %s %%S"
+                                map-sym)
+                              err))))))
+           (add-hook 'after-load-functions fun t)))))
 
 (defun evil-collection-inhibit-insert-state (map-sym)
   "Unmap insertion keys from normal state.
@@ -445,7 +520,7 @@ modes in the current buffer."
   (let ((path (expand-file-name
                (format "modes/%s/%s" mode file) evil-collection-base-dir)))
     (when (file-exists-p path)
-        path)))
+      path)))
 
 (defun evil-collection-open-config-file (mode)
   "Open configuration file corresponding to MODE."
