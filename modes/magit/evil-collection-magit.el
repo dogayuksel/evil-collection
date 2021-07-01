@@ -65,13 +65,14 @@
                                        magit-submodule-list-mode-map))
 
 (defcustom evil-collection-magit-use-y-for-yank t
-  "When non nil, replace \"y\" for `magit-show-refs-popup' with
-\"yy\" for `evil-collection-magit-yank-whole-line', `ys'
-`magit-copy-section-value', \"yb\" for
-`magit-copy-buffer-revision' and \"yr\" for
-`magit-show-refs-popup'. This keeps \"y\" for
-`magit-show-refs-popup' in the help
-popup (`magit-dispatch-popup'). Default is t."
+  "When non nil (Default is t),
+replace \"y\" for `magit-show-refs' with
+\"yy\" for `evil-collection-magit-yank-whole-line',
+\"ys\" for `magit-copy-section-value',
+\"yb\" for `magit-copy-buffer-revision' and
+\"yr\" for `magit-show-refs'.
+This keeps \"y\" for `magit-show-refs',
+in the help popup (`magit-dispatch')."
   :group 'magit
   :type 'boolean)
 
@@ -318,8 +319,8 @@ moment.")
        (,states magit-mode-map ,(kbd "S-SPC") magit-diff-show-or-scroll-up   "SPC")
        (,states magit-mode-map ,(kbd "S-DEL") magit-diff-show-or-scroll-down "DEL")
 
-       ((,evil-collection-magit-state) magit-mode-map ,evil-toggle-key evil-emacs-state)
-       ((,evil-collection-magit-state) magit-mode-map "<escape>" magit-mode-bury-buffer))
+       ((,evil-collection-magit-state) magit-mode-map ,(kbd evil-toggle-key) evil-emacs-state)
+       ((,evil-collection-magit-state) magit-mode-map ,(kbd "<escape>") magit-mode-bury-buffer))
 
      (if (eq evil-search-module 'evil-search)
          `((,states magit-mode-map "/" evil-ex-search-forward)

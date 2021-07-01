@@ -32,6 +32,7 @@
 
 (declare-function emms-with-inhibit-read-only-t "emms")
 (declare-function emms-playlist-mode-correct-previous-yank "emms-playlist-mode")
+(declare-function emms-playlist-mode-yank "emms-playlist-mode")
 
 (defvar emms-browser-mode-map)
 (defvar emms-playlist-mode-map)
@@ -59,7 +60,7 @@ The return value is the yanked text."
   (interactive)
   (emms-with-inhibit-read-only-t
    (goto-char (point-at-bol))
-   (yank)
+   (emms-playlist-mode-yank)
    (emms-playlist-mode-correct-previous-yank)
    (evil-previous-line)
    (evil-beginning-of-line)))
